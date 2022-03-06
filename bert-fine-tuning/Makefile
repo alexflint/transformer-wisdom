@@ -36,6 +36,13 @@ ssh:
 	gcloud compute ssh $(EG) \
 		--zone $(ZONE)
 
+# create a tunnel to the TPU worker grpc endpoint
+tunnel:
+	gcloud compute ssh my-execution-group \
+		--zone=$(ZONE) \
+		-- \
+		-L 19870:10.125.250.138:8470
+
 # create firewall ruleset
 
 # gcloud compute firewall-rules create $(RULESET_NAME) \
