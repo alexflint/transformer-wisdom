@@ -10,9 +10,7 @@ def add_fn(x, y):
 def main():
     print("creating the resolver...")
     resolver = tf.distribute.cluster_resolver.TPUClusterResolver.connect(
-        tpu='grpc://127.0.0.1:19870',
-        zone='us-central1-b',
-        project='transformer-wisdom')
+        tpu='grpc://127.0.0.1:19870')
 
     print("creating strategy...")
     strategy = tf.distribute.TPUStrategy(resolver)

@@ -1,8 +1,8 @@
+BASTION := bastion			# Name of the instance for SSH tunnel
 TPU := bert-fine-tuning		# TPU name
 TYPE := v3-8  				# TPU type (just v2-8 or v3-8)
 TENSORFLOW_RUNTIME := 2.8.0
 NETWORK := default
-
 ZONE := $(shell cat Makefile.zone)   # Must be one of us-central1-[abc], europe-west4-a, or asia-east1-c
 
 # On google cloud there are TPUs, TPU VMs, and TPU execution groups. A TPU
@@ -39,8 +39,6 @@ list-tensorflow-versions:
 	gcloud alpha compute tpus tpu-vm versions list \
 		--zone=$(ZONE)
 
-BASTION := bastion
-
 create-bastion:
 	gcloud compute instances create $(BASTION) \
 		--zone $(ZONE) \
@@ -57,14 +55,13 @@ tunnel:
 		-- \
 		-N \
 		-L 19870:$(shell \
-			gcloud compute tpus describe bert-fine-tuning \
+			gcloud compute tpus describe $(TPU) \
 				--zone=$(ZONE) \
 				--format='get(ipAddress,port)[separator=:]')
 
-
-
 #
 # OLD: TPU VMs
+#
 
 TPU_RUNTIME := tpu-vm-tf-$(TENSORFLOW_RUNTIME)
 

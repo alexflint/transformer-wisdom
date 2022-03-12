@@ -132,6 +132,7 @@ def main():
     tpu_strategy = tf.distribute.TPUStrategy(tpu_resolver)
 
     print("running an operation on the TPU...")
+
     @tf.function
     def add_fn(x, y):
         z = x + y
@@ -165,14 +166,14 @@ def main():
         # plot the model architecture
         print("plotting model...")
         tf.keras.utils.plot_model(bert_classifier,
-                                show_shapes=True,
-                                dpi=48,
-                                to_file="out/classifier.pdf")
+                                  show_shapes=True,
+                                  dpi=48,
+                                  to_file="out/classifier.pdf")
 
         tf.keras.utils.plot_model(bert_encoder,
-                                show_shapes=True,
-                                dpi=48,
-                                to_file="out/encoder.pdf")
+                                  show_shapes=True,
+                                  dpi=48,
+                                  to_file="out/encoder.pdf")
 
         #
         # Dataset
@@ -231,27 +232,31 @@ def main():
 
         # create an optimizer (this is still part of tf-models.official)
         optimizer = nlp.optimization.create_optimizer(
-            2e-5, num_train_steps=num_train_steps, num_warmup_steps=warmup_steps)
+            2e-5,
+            num_train_steps=num_train_steps,
+            num_warmup_steps=warmup_steps)
 
         assert isinstance(optimizer, official.nlp.optimization.AdamWeightDecay)
 
         # set up metrics and a loss function
         metrics = [
             tf.keras.metrics.SparseCategoricalAccuracy('accuracy',
-                                                    dtype=tf.float32)
+                                                       dtype=tf.float32)
         ]
         loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
         # compile the classifier (what does this actually do?)
         print("compiling model...")
-        bert_classifier.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+        bert_classifier.compile(optimizer=optimizer,
+                                loss=loss,
+                                metrics=metrics)
 
         # run training
         print("fitting model...")
         bert_classifier.fit(glue_train,
                             glue_train_labels,
                             validation_data=(glue_validation,
-                                            glue_validation_labels),
+                                             glue_validation_labels),
                             batch_size=batch_size,
                             epochs=epochs)
 
