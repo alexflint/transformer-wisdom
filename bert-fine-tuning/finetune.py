@@ -124,9 +124,7 @@ def main():
     # connect and initialize the TPU
     print("connecting to TPU...")
     tpu_resolver = tf.distribute.cluster_resolver.TPUClusterResolver.connect(
-        tpu='grpc://127.0.0.1:19870',
-        zone='us-central1-b',
-        project='transformer-wisdom')
+        tpu='grpc://127.0.0.1:19870')
 
     print("creating TPU strategy...")
     tpu_strategy = tf.distribute.TPUStrategy(tpu_resolver)
