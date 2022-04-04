@@ -1,8 +1,10 @@
 import os
+import sys
 import argparse
+
+import glog as log
 import numpy as np
 import tensorflow as tf
-
 
 # Random seed for determinism when shuffling the dataset
 SEED = 123
@@ -11,30 +13,44 @@ SEED = 123
 BATCH_SIZE_PER_REPLICA = 64
 
 
+def print(s):
+    __builtins__.print(s)
+    sys.stdout.flush()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tpu", default="grpc://127.0.0.1:19870")
-    parser.add_argument("--train_data", default="gs://transformer-wisdom-data/mnist-train")
-    parser.add_argument("--test_data", default="gs://transformer-wisdom-data/mnist-test")
-    parser.add_argument("--checkpoints", default="gs://transformer-wisdom-data/experiment0")
+    parser.add_argument("--train_data",
+                        default="gs://transformer-wisdom-data/mnist-train")
+    parser.add_argument("--test_data",
+                        default="gs://transformer-wisdom-data/mnist-test")
+    parser.add_argument("--checkpoints",
+                        default="gs://transformer-wisdom-data/experiment0")
     parser.add_argument("--epochs", type=int, default=5)
     args = parser.parse_args()
 
-    print(f"connecting to TPU at {args.tpu}...")
-    resolver = tf.distribute.cluster_resolver.TPUClusterResolver.connect(tpu=args.tpu)
+    log.info(f"connecting to TPU at {args.tpu}...")
+    resolver = tf.distribute.cluster_resolver.TPUClusterResolver.connect(
+        tpu=args.tpu)
     strategy = tf.distribute.TPUStrategy(resolver)
-    print(f"number of devices: {strategy.num_replicas_in_sync}")
+    log.info(f"number of devices: {strategy.num_replicas_in_sync}")
 
     # initialize the random seed for determinism
     #tf.random.set_seed(SEED)
 
     global_batch_size = BATCH_SIZE_PER_REPLICA * strategy.num_replicas_in_sync
 
-    # load the data
-    print("loading the dataset...")
+    #
+    # Load the data
+    #
+
+    log.info("loading the dataset...")
     with strategy.scope():
-        train_data = tf.data.experimental.load(args.train_data).shuffle(10000, seed=SEED).batch(global_batch_size)
-        test_data = tf.data.experimental.load(args.test_data).batch(global_batch_size)
+        train_data = tf.data.experimental.load(args.train_data).shuffle(
+            10000, seed=SEED).batch(global_batch_size)
+        test_data = tf.data.experimental.load(
+            args.test_data).batch(global_batch_size)
 
     distr_train_data = strategy.experimental_distribute_dataset(train_data)
     distr_test_data = strategy.experimental_distribute_dataset(test_data)
@@ -42,17 +58,21 @@ def main():
     # Create a checkpoint directory
     checkpoint_prefix = os.path.join(args.checkpoints, "ckpt")
 
-    with strategy.scope():
-        print("setting up model....")
+    #
+    # Create model
+    #
 
+    log.info("creating model....")
+    with strategy.scope():
         # Set reduction to `none` so we can do the reduction afterwards and divide by
         # global batch size.
         loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-            from_logits=True,
-            reduction=tf.keras.losses.Reduction.NONE)
+            from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
+
         def compute_loss(labels, predictions):
             per_example_loss = loss_object(labels, predictions)
-            return tf.nn.compute_average_loss(per_example_loss, global_batch_size=global_batch_size)
+            return tf.nn.compute_average_loss(
+                per_example_loss, global_batch_size=global_batch_size)
 
         test_loss = tf.keras.metrics.Mean(name='test_loss')
         train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
@@ -86,7 +106,7 @@ def main():
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
         train_accuracy.update_state(labels, predictions)
-        return loss 
+        return loss
 
     # Test step
     def test_step(inputs):
@@ -102,15 +122,17 @@ def main():
     # with the distributed input.
     @tf.function
     def distributed_train_step(dataset_inputs):
-        per_replica_losses = strategy.run(train_step, args=(dataset_inputs,))
-        return strategy.reduce(
-            tf.distribute.ReduceOp.SUM,
-            per_replica_losses,
-            axis=None)
+        per_replica_losses = strategy.run(train_step, args=(dataset_inputs, ))
+        return strategy.reduce(tf.distribute.ReduceOp.SUM,
+                               per_replica_losses,
+                               axis=None)
 
     @tf.function
     def distributed_test_step(dataset_inputs):
-        return strategy.run(test_step, args=(dataset_inputs,))
+        return strategy.run(test_step, args=(dataset_inputs, ))
+
+    # print model summary
+    model.summary()
 
     print(f"training model for {args.epochs} epochs...")
     for epoch in range(args.epochs):
@@ -127,19 +149,19 @@ def main():
             distributed_test_step(x)
 
         if epoch % 2 == 0:
+            log.info(f"saving checkpoint to {checkpoint_prefix}...")
             checkpoint.save(checkpoint_prefix)
 
         template = "Epoch {}, Loss: {}, Accuracy: {}, Test Loss: {}, Test Accuracy: {}"
-        print(template.format(
-            epoch+1,
-            train_loss,
-            train_accuracy.result()*100,
-            test_loss.result(),
-            test_accuracy.result()*100))
+        log.info(
+            template.format(epoch + 1, train_loss,
+                            train_accuracy.result() * 100, test_loss.result(),
+                            test_accuracy.result() * 100))
 
         test_loss.reset_states()
         train_accuracy.reset_states()
         test_accuracy.reset_states()
+
 
 if __name__ == "__main__":
     main()

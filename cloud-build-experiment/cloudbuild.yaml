@@ -1,0 +1,14 @@
+# To get this to work I had to:
+#  - create a compute instance named "bastion"
+#  - install the ubuntu package "simpleproxy"
+#  - run simpleproxy to create a proxy for the hidden TPU
+#  - create a TCP firewall rule to allow traffic on 19870 to the instance with the proxy
+# The IP address below is the external IP of "bastion"
+
+steps:
+# - name: 'ubuntu'
+#   entrypoint: bash
+#   args: ['-c', 'apt update && apt install -y netcat && echo hello && netcat -v -w 1 35.226.228.241 19870 < /dev/null']
+ - name: 'gcr.io/deeplearning-platform-release/tf-cpu.2-8'
+   entrypoint: python3
+   args: ['test-tpu.py', '--tpu', 'grpc://35.226.228.241:19870']  # this is the IP of the bastion instance
